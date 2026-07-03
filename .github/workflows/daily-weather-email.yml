@@ -21,8 +21,8 @@ jobs:
       - name: Send weather email
         env:
           SMTP_HOST: smtp.qq.com
-          SMTP_PORT: 465
-          SMTP_USE_SSL: true
+          SMTP_PORT: 587
+          SMTP_USE_SSL: false
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           WEATHER_EMAIL_TO: ${{ secrets.WEATHER_EMAIL_TO }}

@@ -19,12 +19,23 @@ cp env.example .env
 
 需要配置：
 
-- `SMTP_HOST`：SMTP 服务器，例如 `smtp.qq.com`
-- `SMTP_PORT`：SSL 通常是 `465`
-- `SMTP_USE_SSL`：默认 `true`
-- `SMTP_USER`：发件邮箱
+- `SMTP_HOST`：SMTP 服务器，例如 QQ 邮箱可用 `smtp.qq.com`
+- `SMTP_PORT`：SMTP 端口，例如 `587`
+- `SMTP_USE_SSL`：是否直连 SSL；如果使用 `587 + STARTTLS`，这里填 `false`
+- `SMTP_USER`：发件邮箱，例如 `your_name@qq.com`
 - `SMTP_PASSWORD`：邮箱授权码或 SMTP 密码
-- `WEATHER_EMAIL_TO`：收件邮箱，多个用英文逗号分隔
+- `WEATHER_EMAIL_TO`：收件邮箱，多个用英文逗号分隔，格式如 `a@example.com,b@example.com`
+
+当前常用配置示例：
+
+```env
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=587
+SMTP_USE_SSL=false
+SMTP_USER=your_name@qq.com
+SMTP_PASSWORD=your_smtp_authorization_code
+WEATHER_EMAIL_TO=a@example.com,b@example.com
+```
 
 ## 手动测试
 
