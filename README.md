@@ -1,6 +1,6 @@
-# 上海明日工作日天气邮件
+# 上海明日天气邮件
 
-每天下午 6 点前获取上海市明天的天气预报。如果明天是工作日，则发送邮件到指定邮箱；如果明天不是工作日，则跳过。
+每天下午 6 点前获取上海市明天的天气预报，并发送邮件到指定邮箱。
 
 天气数据来源：Open-Meteo，无需 API Key。
 
@@ -26,11 +26,6 @@ cp env.example .env
 - `SMTP_PASSWORD`：邮箱授权码或 SMTP 密码
 - `WEATHER_EMAIL_TO`：收件邮箱，多个用英文逗号分隔
 
-如需处理法定节假日或调休：
-
-- `WEATHER_EMAIL_HOLIDAYS=2026-10-01,2026-10-02`
-- `WEATHER_EMAIL_EXTRA_WORKDAYS=2026-09-27`
-
 ## 手动测试
 
 先加载环境变量：
@@ -44,16 +39,14 @@ set +a
 只打印邮件内容，不发送：
 
 ```bash
-python3 daily_shanghai_weather.py --dry-run --force
+python3 daily_shanghai_weather.py --dry-run
 ```
 
 真实发送：
 
 ```bash
-python3 daily_shanghai_weather.py --force
+python3 daily_shanghai_weather.py
 ```
-
-正常定时运行时不要加 `--force`，这样周末会自动跳过。
 
 ## GitHub Actions 定时任务
 
@@ -69,11 +62,6 @@ GitHub Actions 的 cron 使用 UTC，所以 workflow 中配置的是 `09:50 UTC`
 - `SMTP_USER`
 - `SMTP_PASSWORD`
 - `WEATHER_EMAIL_TO`
-
-可选配置 Variables：
-
-- `WEATHER_EMAIL_HOLIDAYS`
-- `WEATHER_EMAIL_EXTRA_WORKDAYS`
 
 配置路径：`Settings` -> `Secrets and variables` -> `Actions`。
 

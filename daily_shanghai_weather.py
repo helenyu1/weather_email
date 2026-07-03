@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send tomorrow's Shanghai workday weather forecast by email."""
+"""Send tomorrow's Shanghai weather forecast by email."""
 
 from __future__ import annotations
 
@@ -71,27 +71,6 @@ def require_env(name: str) -> str:
     return value
 
 
-def is_workday(target_date: date) -> bool:
-    holidays = parse_date_set(os.getenv("WEATHER_EMAIL_HOLIDAYS", ""))
-    extra_workdays = parse_date_set(os.getenv("WEATHER_EMAIL_EXTRA_WORKDAYS", ""))
-
-    if target_date in extra_workdays:
-        return True
-    if target_date in holidays:
-        return False
-    return target_date.weekday() < 5
-
-
-def parse_date_set(raw_value: str) -> set[date]:
-    result: set[date] = set()
-    for item in raw_value.split(","):
-        item = item.strip()
-        if not item:
-            continue
-        result.add(date.fromisoformat(item))
-    return result
-
-
 def fetch_forecast(target_date: date) -> Forecast:
     params = {
         "latitude": SHANGHAI_LATITUDE,
@@ -136,8 +115,8 @@ def build_email(forecast: Forecast) -> EmailMessage:
 
     probability = forecast.precipitation_probability_max
     probability_text = "暂无数据" if probability is None else f"{probability}%"
-    subject = f"上海明日工作日天气 {forecast.forecast_date.isoformat()}"
-    body = f"""上海市明日工作日天气预报
+    subject = f"上海明日天气 {forecast.forecast_date.isoformat()}"
+    body = f"""上海市明日天气预报
 
 日期：{forecast.forecast_date.isoformat()}
 天气：{forecast.weather_text}
@@ -178,15 +157,11 @@ def send_email(message: EmailMessage) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="发送上海明日工作日天气邮件")
+    parser = argparse.ArgumentParser(description="发送上海明日天气邮件")
     parser.add_argument("--dry-run", action="store_true", help="只打印邮件内容，不发送")
-    parser.add_argument("--force", action="store_true", help="即使明天不是工作日也发送")
     args = parser.parse_args()
 
     tomorrow = datetime.now(ZoneInfo(SHANGHAI_TIMEZONE)).date() + timedelta(days=1)
-    if not args.force and not is_workday(tomorrow):
-        print(f"{tomorrow.isoformat()} 不是工作日，跳过发送。")
-        return 0
 
     forecast = fetch_forecast(tomorrow)
     message = build_email(forecast)
