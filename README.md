@@ -1,8 +1,8 @@
-# 上海明日天气邮件
+# 上海工作日天气邮件
 
-每天下午 6 点前获取上海市明天的天气预报，并发送邮件到指定邮箱。
+仅在工作日的 17:30 发送邮件，内容包含上海当天 18:00 的小时天气和明天的天气预报。
 
-天气数据来源：Open-Meteo，无需 API Key。
+天气数据来源：Open-Meteo，无需 API Key；如果主接口失败，会自动回退到 wttr.in。
 
 支持两种运行方式：
 
@@ -42,6 +42,8 @@ set +a
 python3 daily_shanghai_weather.py --dry-run
 ```
 
+如果当天不是工作日，脚本会直接跳过发送。
+
 真实发送：
 
 ```bash
@@ -50,9 +52,9 @@ python3 daily_shanghai_weather.py
 
 ## GitHub Actions 定时任务
 
-项目内已包含 `.github/workflows/daily-weather-email.yml`，默认每天 `17:50` 上海时间运行。
+项目内已包含 `.github/workflows/daily-weather-email.yml`，默认每天 `17:30` 上海时间运行；脚本内部会在周末自动跳过。
 
-GitHub Actions 的 cron 使用 UTC，所以 workflow 中配置的是 `09:50 UTC`。
+GitHub Actions 的 cron 使用 UTC，所以 workflow 中配置的是 `09:30 UTC`。
 
 需要在 GitHub 仓库中配置 Secrets：
 
@@ -78,7 +80,7 @@ cp com.local.shanghai-weather-email.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.local.shanghai-weather-email.plist
 ```
 
-默认配置为每天 `17:50` 运行。
+默认配置为每天 `17:30` 运行；脚本内部会在周末自动跳过。
 
 ## 安全说明
 
