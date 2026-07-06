@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send Shanghai workday weather email with today's 18:00 weather and tomorrow's forecast."""
+"""Send Shanghai workday weather email with today's 18:00 rain status and temperature."""
 
 from __future__ import annotations
 
@@ -104,6 +104,50 @@ WTTR_WEATHER_CODE_TEXT = {
     "395": "雷暴伴强阵雪",
 }
 
+RAIN_LEVEL_BY_CODE = {
+    "51": "小雨",
+    "53": "小雨",
+    "55": "中雨",
+    "56": "小雨",
+    "57": "中雨",
+    "61": "小雨",
+    "63": "中雨",
+    "65": "大雨",
+    "66": "中雨",
+    "67": "大雨",
+    "80": "小雨",
+    "81": "中雨",
+    "82": "大雨",
+    "95": "暴雨",
+    "96": "暴雨",
+    "99": "暴雨",
+    "176": "小雨",
+    "179": "小雨",
+    "182": "中雨",
+    "185": "中雨",
+    "263": "小雨",
+    "266": "小雨",
+    "281": "小雨",
+    "284": "中雨",
+    "293": "小雨",
+    "296": "小雨",
+    "299": "中雨",
+    "302": "中雨",
+    "305": "大雨",
+    "308": "大雨",
+    "311": "中雨",
+    "314": "大雨",
+    "317": "小雨",
+    "320": "中雨",
+    "353": "小雨",
+    "356": "中雨",
+    "359": "大雨",
+    "386": "暴雨",
+    "389": "暴雨",
+    "392": "暴雨",
+    "395": "暴雨",
+}
+
 
 @dataclass(frozen=True)
 class Forecast:
@@ -134,6 +178,14 @@ def require_env(name: str) -> str:
 
 def is_workday(target_date: date) -> bool:
     return target_date.weekday() < 5
+
+
+def rain_level_text(weather_code: str | int) -> str:
+    return RAIN_LEVEL_BY_CODE.get(str(weather_code), "不下雨")
+
+
+def rain_status_text(rain_level: str) -> str:
+    return "是" if rain_level != "不下雨" else "否"
 
 
 def fetch_json(url: str) -> dict:
@@ -265,7 +317,7 @@ def fetch_hourly_weather(target_time: datetime) -> HourlyWeather:
 
     return HourlyWeather(
         forecast_time=target_time,
-        weather_text=WEATHER_CODE_TEXT.get(weather_code, f"未知天气代码 {weather_code}"),
+        weather_text=rain_level_text(weather_code),
         temperature=float(hourly["temperature_2m"][index]),
         precipitation_probability=precipitation_probability,
         wind_speed=float(hourly["wind_speed_10m"][index]),
@@ -286,7 +338,7 @@ def fetch_hourly_weather_from_wttr(target_time: datetime) -> HourlyWeather:
             weather_code = hourly.get("weatherCode", "")
             return HourlyWeather(
                 forecast_time=target_time,
-                weather_text=wttr_weather_text(weather_code, hourly.get("weatherDesc")),
+                weather_text=rain_level_text(weather_code),
                 temperature=float(hourly.get("tempC", "0") or 0),
                 precipitation_probability=int(hourly.get("chanceofrain", "0") or 0),
                 wind_speed=float(hourly.get("windspeedKmph", "0") or 0),
@@ -302,36 +354,23 @@ def get_hourly_weather(target_time: datetime) -> HourlyWeather:
         return fetch_hourly_weather_from_wttr(target_time)
 
 
-def build_email(today_weather: HourlyWeather, tomorrow_forecast: Forecast) -> EmailMessage:
+def build_email(today_weather: HourlyWeather) -> EmailMessage:
     sender = require_env("SMTP_USER")
     recipients = [item.strip() for item in require_env("WEATHER_EMAIL_TO").split(",") if item.strip()]
     if not recipients:
         raise RuntimeError("WEATHER_EMAIL_TO 未配置有效收件人")
 
-    today_probability = today_weather.precipitation_probability
-    today_probability_text = "暂无数据" if today_probability is None else f"{today_probability}%"
-    tomorrow_probability = tomorrow_forecast.precipitation_probability_max
-    tomorrow_probability_text = "暂无数据" if tomorrow_probability is None else f"{tomorrow_probability}%"
-    subject = (
-        f"上海今日18点与明日天气 {today_weather.forecast_time.date().isoformat()} / "
-        f"{tomorrow_forecast.forecast_date.isoformat()}"
-    )
-    body = f"""上海市工作日天气提醒
+    rain_level = today_weather.weather_text
+    rain_status = rain_status_text(rain_level)
+    rain_level_display = rain_level if rain_status == "是" else "无"
+    subject = f"上海今日18:00实时天气 {today_weather.forecast_time.date().isoformat()}"
+    body = f"""上海市今日18:00实时天气
 
 今日 18:00 天气
 日期：{today_weather.forecast_time.strftime('%Y-%m-%d %H:%M')}
-天气：{today_weather.weather_text}
+是否下雨：{rain_status}
+降雨等级：{rain_level_display}
 温度：{today_weather.temperature:.1f}°C
-降水概率：{today_probability_text}
-最大风速：{today_weather.wind_speed:.1f} km/h
-
-明日天气预报
-日期：{tomorrow_forecast.forecast_date.isoformat()}
-天气：{tomorrow_forecast.weather_text}
-温度：{tomorrow_forecast.temperature_min:.1f}°C - {tomorrow_forecast.temperature_max:.1f}°C
-最高降水概率：{tomorrow_probability_text}
-预计降水量：{tomorrow_forecast.precipitation_sum:.1f} mm
-最大风速：{tomorrow_forecast.wind_speed_max:.1f} km/h
 
 数据来源：Open-Meteo Weather Forecast API（失败时自动回退 wttr.in）
 发送时间：{datetime.now(ZoneInfo(SHANGHAI_TIMEZONE)).strftime('%Y-%m-%d %H:%M:%S %Z')}
@@ -365,7 +404,7 @@ def send_email(message: EmailMessage) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="工作日 17:30 发送上海今日18点和明日天气邮件")
+    parser = argparse.ArgumentParser(description="工作日 16:00 发送上海今日18点实时天气邮件")
     parser.add_argument("--dry-run", action="store_true", help="只打印邮件内容，不发送")
     args = parser.parse_args()
 
@@ -379,8 +418,7 @@ def main() -> int:
 
     today_weather_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
     today_weather = get_hourly_weather(today_weather_time)
-    tomorrow_forecast = get_forecast(tomorrow)
-    message = build_email(today_weather, tomorrow_forecast)
+    message = build_email(today_weather)
     if args.dry_run:
         print(f"From: {message['From']}")
         print(f"To: {message['To']}")
@@ -390,7 +428,7 @@ def main() -> int:
         return 0
 
     send_email(message)
-    print(f"已发送上海 {today.isoformat()} 18:00 与 {tomorrow.isoformat()} 天气邮件。")
+    print(f"已发送上海 {today.isoformat()} 18:00 实时天气邮件。")
     return 0
 
 
