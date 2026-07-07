@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send Shanghai workday weather email with today's 18:00 rain status and temperature."""
+"""Send Shanghai workday weather email with today's 18:00 weather and tomorrow's forecast."""
 
 from __future__ import annotations
 
@@ -180,14 +180,6 @@ def is_workday(target_date: date) -> bool:
     return target_date.weekday() < 5
 
 
-def rain_level_text(weather_code: str | int) -> str:
-    return RAIN_LEVEL_BY_CODE.get(str(weather_code), "不下雨")
-
-
-def rain_status_text(rain_level: str) -> str:
-    return "是" if rain_level != "不下雨" else "否"
-
-
 def fetch_json(url: str) -> dict:
     with urllib.request.urlopen(url, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
@@ -317,7 +309,7 @@ def fetch_hourly_weather(target_time: datetime) -> HourlyWeather:
 
     return HourlyWeather(
         forecast_time=target_time,
-        weather_text=rain_level_text(weather_code),
+        weather_text=WEATHER_CODE_TEXT.get(weather_code, f"未知天气代码 {weather_code}"),
         temperature=float(hourly["temperature_2m"][index]),
         precipitation_probability=precipitation_probability,
         wind_speed=float(hourly["wind_speed_10m"][index]),
@@ -338,7 +330,7 @@ def fetch_hourly_weather_from_wttr(target_time: datetime) -> HourlyWeather:
             weather_code = hourly.get("weatherCode", "")
             return HourlyWeather(
                 forecast_time=target_time,
-                weather_text=rain_level_text(weather_code),
+                weather_text=wttr_weather_text(weather_code, hourly.get("weatherDesc")),
                 temperature=float(hourly.get("tempC", "0") or 0),
                 precipitation_probability=int(hourly.get("chanceofrain", "0") or 0),
                 wind_speed=float(hourly.get("windspeedKmph", "0") or 0),
@@ -354,26 +346,23 @@ def get_hourly_weather(target_time: datetime) -> HourlyWeather:
         return fetch_hourly_weather_from_wttr(target_time)
 
 
-def build_email(today_weather: HourlyWeather) -> EmailMessage:
+def build_email(today_weather: HourlyWeather, tomorrow_forecast: Forecast) -> EmailMessage:
     sender = require_env("SMTP_USER")
     recipients = [item.strip() for item in require_env("WEATHER_EMAIL_TO").split(",") if item.strip()]
     if not recipients:
         raise RuntimeError("WEATHER_EMAIL_TO 未配置有效收件人")
 
-    rain_level = today_weather.weather_text
-    rain_status = rain_status_text(rain_level)
-    rain_level_display = rain_level if rain_status == "是" else "无"
-    subject = f"上海今日18:00实时天气 {today_weather.forecast_time.date().isoformat()}"
-    body = f"""上海市今日18:00实时天气
+    subject = f"上海今日18点与明日天气 {today_weather.forecast_time.date().isoformat()} / {tomorrow_forecast.forecast_date.isoformat()}"
+    body = f"""上海市今日18:00实时天气和明天的天气预报
 
 今日 18:00 天气
-日期：{today_weather.forecast_time.strftime('%Y-%m-%d %H:%M')}
-是否下雨：{rain_status}
-降雨等级：{rain_level_display}
+天气：{today_weather.weather_text}
 温度：{today_weather.temperature:.1f}°C
 
-数据来源：Open-Meteo Weather Forecast API（失败时自动回退 wttr.in）
-发送时间：{datetime.now(ZoneInfo(SHANGHAI_TIMEZONE)).strftime('%Y-%m-%d %H:%M:%S %Z')}
+明天天气
+天气：{tomorrow_forecast.weather_text}
+温度：{tomorrow_forecast.temperature_min:.1f}°C - {tomorrow_forecast.temperature_max:.1f}°C
+
 """
 
     message = EmailMessage()
@@ -404,7 +393,7 @@ def send_email(message: EmailMessage) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="工作日 16:00 发送上海今日18点实时天气邮件")
+    parser = argparse.ArgumentParser(description="工作日 16:00 发送上海今日18点和明天天气邮件")
     parser.add_argument("--dry-run", action="store_true", help="只打印邮件内容，不发送")
     args = parser.parse_args()
 
@@ -418,7 +407,8 @@ def main() -> int:
 
     today_weather_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
     today_weather = get_hourly_weather(today_weather_time)
-    message = build_email(today_weather)
+    tomorrow_forecast = get_forecast(tomorrow)
+    message = build_email(today_weather, tomorrow_forecast)
     if args.dry_run:
         print(f"From: {message['From']}")
         print(f"To: {message['To']}")
@@ -428,7 +418,7 @@ def main() -> int:
         return 0
 
     send_email(message)
-    print(f"已发送上海 {today.isoformat()} 18:00 实时天气邮件。")
+    print(f"已发送上海 {today.isoformat()} 18:00 和 {tomorrow.isoformat()} 天气邮件。")
     return 0
 
 
