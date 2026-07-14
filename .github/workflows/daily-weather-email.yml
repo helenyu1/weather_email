@@ -2,8 +2,8 @@ name: Daily Shanghai Weather Email
 
 on:
   schedule:
-    # 15:30 Asia/Shanghai = 07:30 UTC.
-    - cron: "30 7 * * *"
+    # 12:00 Asia/Shanghai = 04:00 UTC.
+    - cron: "0 4 * * *"
   workflow_dispatch:
 
 jobs:
